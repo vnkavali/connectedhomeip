@@ -156,7 +156,7 @@ k32w_sdk_args=""
 
 if [[ -d "$NXP_K32W0_SDK_ROOT" ]]; then
     k32w_sdk_args+="k32w0_sdk_root=\"$NXP_K32W0_SDK_ROOT\""
-    extra_args+=" $k32w0_sdk_args enable_k32w_builds=true"
+    # extra_args+=" $k32w0_sdk_args enable_k32w_builds=true"
 fi
 
 echo
@@ -182,7 +182,7 @@ ti_simplelink_sdk_args=""
 
 if [[ -f "${TI_SYSCONFIG_ROOT}/sysconfig_cli.sh" ]]; then
     ti_simplelink_sdk_args+="ti_sysconfig_root=\"$TI_SYSCONFIG_ROOT\""
-    extra_args+=" $ti_simplelink_sdk_args enable_ti_simplelink_builds=true"
+    # extra_args+=" $ti_simplelink_sdk_args enable_ti_simplelink_builds=true"
 
     echo 'To build the cc13x2x7_26x2x7 lock sample as a standalone project':
     echo "(cd $CHIP_ROOT/examples/lock-app/cc13x2x7_26x2x7; gn gen out/debug --args='$ti_simplelink_sdk_args'; ninja -C out/debug)"

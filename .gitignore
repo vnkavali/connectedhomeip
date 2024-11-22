@@ -5,6 +5,11 @@
 !.vscode/settings.json
 !.vscode/extensions.json
 
+# Local files for Proxy
+.devcontainer/samsung
+.devcontainer/pip
+.devcontainer/.gradle
+
 # Platforms
 .DS_Store
 

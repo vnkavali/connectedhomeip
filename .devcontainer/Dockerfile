@@ -50,12 +50,16 @@ RUN (getent passwd $USER_UID && userdel -f $(getent passwd $USER_UID | cut -d: -
     && chmod 0440 /etc/sudoers.d/$USERNAME \
     && :
 
+COPY samsung/DigitalCity.crt /usr/local/share/ca-certificates/
+RUN apt-get install -y ca-certificates \
+    && update-ca-certificates
+
 RUN curl https://raw.githubusercontent.com/restyled-io/restyler/master/bin/restyle-path -o /usr/local/bin/restyle-path \
     && chmod +x /usr/local/bin/restyle-path \
     && :
 
 RUN mkdir -p /opt/sdk/sdks/ \
-    && chown -R $USERNAME:$USERNAME \
+    && chown -vR $USERNAME:$USERNAME \
     /opt/sdk/sdks/ `# NXP uses a patch_sdk script to change SDK files` \
     $ANDROID_HOME \
     $IDF_TOOLS_PATH \
@@ -63,9 +67,9 @@ RUN mkdir -p /opt/sdk/sdks/ \
     && find $AMEBA_PATH -name "inc_hp" -print0 | xargs -0 chown -R $USERNAME:$USERNAME \
     && find $AMEBA_PATH -name "project_lp" -print0 | xargs -0 chown -R $USERNAME:$USERNAME \
     && find $AMEBA_PATH -name "project_hp" -print0 | xargs -0 chown -R $USERNAME:$USERNAME \
-    && chmod -R +x \
+    && chmod -vR +x \
     $ANDROID_HOME/tools/bin `# sdkmanager for accepting licenses`\
-    && chmod -R +w \
+    && chmod -vR +w \
     $IDF_TOOLS_PATH \
     && find $AMEBA_PATH -name "inc_lp" -print0 | xargs -0 chmod -R +w \
     && find $AMEBA_PATH -name "inc_hp" -print0 | xargs -0 chmod -R +w \
@@ -86,12 +90,15 @@ ENV TIZEN_ROOTFS /tizen_rootfs
 # Fast Model GDB plugins path for debugging support
 ENV FAST_MODEL_PLUGINS_PATH /opt/FastModelsPortfolio_11.16/plugins/Linux64_GCC-9.3
 
-# Set up ccache as a pigweed command launcher when using the scripts/build/build_examples.py
-# script. Also, set up icecc as the command prefix for ccache. Such setup allows to benefit
-# from compilation caching and distributed compilation at the same time.
-#
-# NOTE: In order to use distributed compilation with icecc, one should run
-#       "scripts/icecc.sh start" before starting the build.
-ENV CHIP_PW_COMMAND_LAUNCHER ccache
-ENV CCACHE_PREFIX icecc
-ENV PATH /usr/lib/ccache:$PATH
+COPY --chown=$USERNAME .gradle /home/$USERNAME/.gradle
+COPY --chown=$USERNAME pip /home/$USERNAME/.config/pip
+
+# # Set up ccache as a pigweed command launcher when using the scripts/build/build_examples.py
+# # script. Also, set up icecc as the command prefix for ccache. Such setup allows to benefit
+# # from compilation caching and distributed compilation at the same time.
+# #
+# # NOTE: In order to use distributed compilation with icecc, one should run
+# #       "scripts/icecc.sh start" before starting the build.
+# ENV CHIP_PW_COMMAND_LAUNCHER ccache
+# ENV CCACHE_PREFIX icecc
+# ENV PATH /usr/lib/ccache:$PATH
