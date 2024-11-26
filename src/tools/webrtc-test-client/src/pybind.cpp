@@ -1,0 +1,134 @@
+/*
+ * webrtc has to be compiled with -fno-rtti while pybind11 
+ * requires rtti to work.
+ * The not so satisfactory solution we found is to create 
+ * two dynamic libraries:
+ * 1) libwebrtc.so is compiled with -fno-rtti and interacts with
+ * the native webrtc.
+ * 2) pybind.so is compiled with rtti and is the module imported
+ * by the python interpreter. It is a thin wrapper around libwebrtc.
+ */
+
+#include "libwebrtc.h"
+
+#include <iostream>
+#include <string>
+#include <thread>
+#include <pybind11/pybind11.h>
+#include <pybind11/functional.h>
+#include <pybind11/stl.h>
+
+namespace py = pybind11;
+py::object offer_future;
+py::object answer_future;
+PyThreadState *gil;
+PyGILState_STATE gstate;
+std::function<void(std::string,std::string)> python_logging;
+std::function<void(std::string)> python_on_message;
+
+void guarded_log(std::string level, std::string msg) {
+    gstate = PyGILState_Ensure();
+    python_logging(level, msg);
+    PyGILState_Release(gstate);
+}
+
+void offer_callback(std::string offer) {
+    /* This is being called from a thread which is not the main, read
+     * https://docs.python.org/3/c-api/init.html#non-python-created-threads
+     */
+    std::cout<<"SDP offer: "<<offer<<std::endl;
+    gstate = PyGILState_Ensure();
+    offer_future.attr("set_result")(offer);
+    PyGILState_Release(gstate);
+}
+
+// void offer_callback_chayan(std::string offer) {
+//     /* This is being called from a thread which is not the main, read
+//      * https://docs.python.org/3/c-api/init.html#non-python-created-threads
+//      */
+//     std::cout<<"SDP offer: "<<offer<<std::endl;
+//     // gstate = PyGILState_Ensure();
+//     // offer_future.attr("set_result")(offer);
+//     // PyGILState_Release(gstate);
+// }
+
+void answer_callback(std::string answer) {
+    /* This is being called from a thread which is not the main, read
+     * https://docs.python.org/3/c-api/init.html#non-python-created-threads
+     */
+    gstate = PyGILState_Ensure();
+    answer_future.attr("set_result")(answer);
+    PyGILState_Release(gstate);
+}
+
+void create_offer(py::object future) {
+    /*
+     * We want this thread to release the gil so that python code keeps
+     * executing.
+     */
+    // gil = PyEval_SaveThread();
+    gstate = PyGILState_Ensure();
+    std::cout<<"gstate ensured in create_offer"<<std::endl;
+    offer_future = future;
+    std::cout<<"future initialised"<<std::endl;
+    pywebrtc::create_offer(offer_callback);
+    std::cout<<"pywebrtc::create_offer called"<<std::endl;
+    PyGILState_Release(gstate);
+    std::cout<<"gstate released in create_offer"<<std::endl;
+    // PyEval_RestoreThread(gil);
+}
+
+void create_offer_async(std::function<void(std::string)> offer_callback_async) {
+    /*
+     * We want this thread to release the gil so that python code keeps
+     * executing.
+     */
+    // gil = PyEval_SaveThread();
+    gstate = PyGILState_Ensure();
+    std::cout<<"gstate ensured in create_offer"<<std::endl;
+    
+    pywebrtc::create_offer(offer_callback_async);
+    std::cout<<"pywebrtc::create_offer called"<<std::endl;
+    PyGILState_Release(gstate);
+    std::cout<<"gstate released in create_offer"<<std::endl;
+    // PyEval_RestoreThread(gil);
+}
+
+void create_answer(std::string offer, py::object future) {
+    gil = PyEval_SaveThread();
+    answer_future = future;
+    pywebrtc::create_answer(offer, answer_callback);
+    PyEval_RestoreThread(gil);
+}
+
+void set_answer(const std::string& answer) {
+    gil = PyEval_SaveThread();
+    pywebrtc::set_answer(answer);
+    PyEval_RestoreThread(gil);
+}
+
+void constructor(std::function<void(std::string,std::string)> logging_callback, 
+                 std::function<void(std::string)> on_message_callback) {
+    python_logging = logging_callback;
+    python_on_message =  on_message_callback;
+    pywebrtc::set_logging(logging_callback);
+    pywebrtc::set_on_message(python_on_message);
+    pywebrtc::initialize();
+}
+
+auto cleanup_callback = []() {
+    pywebrtc::destructor();
+};
+
+
+PYBIND11_MODULE(pybind, m) {
+    m.def("constructor", &constructor);
+    m.def("create_offer", &create_offer);
+    m.def("create_offer_async", &create_offer_async);
+    m.def("create_answer", &create_answer);
+    m.def("set_answer", &set_answer);
+    // m.def("get_candidates", &pywebrtc::get_candidates);
+    m.def("set_candidates", &pywebrtc::set_candidates);
+    m.def("send_data", &pywebrtc::send_data);
+    m.add_object("_cleanup", py::capsule(cleanup_callback));
+}
